@@ -1,0 +1,16 @@
+# Git
+.git/
+
+# Documentation
+*.md
+
+# Downloaded server files (bind-mounted, not baked in)
+acc-server/
+
+# Build artifacts
+*.tar
+*.gz
+
+# IDE
+.vscode/
+.idea/

@@ -1,0 +1,10 @@
+# Downloaded ACC server files
+acc-server/
+
+# Docker artifacts
+*.tar
+*.gz
+
+# OS
+.DS_Store
+Thumbs.db

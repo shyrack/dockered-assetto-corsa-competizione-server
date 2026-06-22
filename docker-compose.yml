@@ -1,0 +1,13 @@
+services:
+  acc:
+    image: acc-server
+    container_name: acc-server
+    restart: unless-stopped
+    init: true
+    ports:
+      - "9600:9600/tcp"
+      - "9600:9600/udp"
+      - "9601:9601/tcp"
+      - "9601:9601/udp"
+    volumes:
+      - ./acc-server:/app
