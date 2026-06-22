@@ -3,7 +3,7 @@
 Docker image providing a Wine runtime to run the Windows-based ACC dedicated server on Linux.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Build and Publish](https://github.com/oflorian/dockered-assetto-corsa-competizione-server/actions/workflows/workflow.yaml/badge.svg)](https://github.com/oflorian/dockered-assetto-corsa-competizione-server/actions/workflows/workflow.yaml)
+[![Build and Publish](https://github.com/shyrack/dockered-assetto-corsa-competizione-server/actions/workflows/workflow.yaml/badge.svg)](https://github.com/shyrack/dockered-assetto-corsa-competizione-server/actions/workflows/workflow.yaml)
 
 ## Table of Contents
 
@@ -80,7 +80,7 @@ docker build -t acc-server .
 Pre-built images are published to `ghcr.io` on every tagged release. Pull the image instead of building:
 
 ```sh
-docker pull ghcr.io/oflorian/dockered-assetto-corsa-competizione-server:latest
+docker pull ghcr.io/shyrack/dockered-assetto-corsa-competizione-server:latest
 ```
 
 If using the pre-built image, update your `docker-compose.yml` or `docker run` command to reference the `ghcr.io` image.
@@ -218,7 +218,7 @@ docker compose restart
 If using a pre-built image, also pull the latest version:
 
 ```sh
-docker pull ghcr.io/oflorian/dockered-assetto-corsa-competizione-server:latest
+docker pull ghcr.io/shyrack/dockered-assetto-corsa-competizione-server:latest
 ```
 
 ## CI/CD
@@ -226,14 +226,13 @@ docker pull ghcr.io/oflorian/dockered-assetto-corsa-competizione-server:latest
 This repository includes a GitHub Actions workflow (`.github/workflows/workflow.yaml`) that builds and publishes the Docker image to `ghcr.io` on every tagged release matching `releases/*`. The workflow:
 
 - Builds for `linux/amd64`
-- Generates SBOM provenance
-- Tags images with the SemVer version and Git SHA
+- Tags images with SemVer (`0.0.1`, `0.0`, `0`), `latest`, and Git SHA
 
 Manual dispatches are also supported via `workflow_dispatch`.
 
 ## Contributing
 
-Contributions are welcome. Please open an issue or pull request on [GitHub](https://github.com/oflorian/dockered-assetto-corsa-competizione-server).
+Contributions are welcome. Please open an issue or pull request on [GitHub](https://github.com/shyrack/dockered-assetto-corsa-competizione-server).
 
 ## License
 
