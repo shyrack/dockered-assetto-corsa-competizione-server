@@ -4,6 +4,11 @@ on:
   push:
     tags:
       - 'releases/*'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   REGISTRY: ghcr.io
@@ -12,6 +17,7 @@ env:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: read
       packages: write
@@ -40,6 +46,8 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
+          platforms: linux/amd64
           push: true
+          provenance: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
