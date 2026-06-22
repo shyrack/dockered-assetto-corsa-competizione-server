@@ -3,34 +3,115 @@
 Docker image providing a Wine runtime to run the Windows-based ACC dedicated server on Linux.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Build and Publish](https://github.com/oflorian/dockered-assetto-corsa-competizione-server/actions/workflows/workflow.yaml/badge.svg)](https://github.com/oflorian/dockered-assetto-corsa-competizione-server/actions/workflows/workflow.yaml)
+
+## Table of Contents
+
+- [Features](#features)
+- [Quick Start](#quick-start)
+- [Prerequisites](#prerequisites)
+- [Installation](#installation)
+  - [Download Server Files](#download-server-files)
+  - [Build from Source](#build-from-source)
+  - [Use Pre-built Image](#use-pre-built-image)
+- [Running the Server](#running-the-server)
+  - [Docker Compose (recommended)](#docker-compose-recommended)
+  - [Docker CLI](#docker-cli)
+- [Configuration](#configuration)
+- [Ports and Networking](#ports-and-networking)
+- [Healthcheck](#healthcheck)
+- [Volumes](#volumes)
+- [Environment Variables](#environment-variables)
+- [Stopping the Server](#stopping-the-server)
+- [Viewing Logs](#viewing-logs)
+- [Updating the ACC Server](#updating-the-acc-server)
+- [CI/CD](#cicd)
+- [Contributing](#contributing)
+- [License](#license)
+
+## Features
+
+- Runs the Windows-based ACC dedicated server on Linux via Wine
+- Alpine-based image for a small footprint
+- Non-root user for improved security
+- Built-in healthcheck via the ACC HTTP broadcasting API
+- Pre-built images published to GitHub Container Registry
+- Graded shutdown via `SIGTERM`
+
+## Quick Start
+
+```sh
+# 1. Install SteamCMD and download server files
+steamcmd +@sSteamCmdForcePlatformType windows +force_install_dir ./acc-server +login YOUR_STEAM_ACCOUNT +app_update 1430110 +quit
+
+# 2. Add your config files
+mkdir -p acc-server/cfg
+cp configuration.json settings.json event.json acc-server/cfg/
+
+# 3. Start the server
+docker compose up -d
+```
 
 ## Prerequisites
 
-- Docker 21.05+
-- ACC dedicated server files downloaded to `./acc-server/`
+- **Docker** 21.05+
+- **ACC dedicated server files** (Steam App ID 1430110) placed in `./acc-server/`
 
-Download the ACC dedicated server (Steam App ID 1430110) to your host:
+## Installation
+
+### Download Server Files
+
+Install [SteamCMD](https://developer.valvesoftware.com/wiki/SteamCMD) and download the ACC dedicated server:
 
 ```sh
-# Install SteamCMD (see https://developer.valvesoftware.com/wiki/SteamCMD)
 steamcmd +@sSteamCmdForcePlatformType windows +force_install_dir ./acc-server +login YOUR_STEAM_ACCOUNT +app_update 1430110 +quit
 ```
 
 The server files will be in `./acc-server/` with `accServer.exe` at the root.
 
-## Build
+### Build from Source
 
 ```sh
 docker build -t acc-server .
 ```
 
-## Run
+### Use Pre-built Image
+
+Pre-built images are published to `ghcr.io` on every tagged release. Pull the image instead of building:
+
+```sh
+docker pull ghcr.io/oflorian/dockered-assetto-corsa-competizione-server:latest
+```
+
+If using the pre-built image, update your `docker-compose.yml` or `docker run` command to reference the `ghcr.io` image.
+
+## Running the Server
 
 ### Docker Compose (recommended)
 
 ```sh
 docker compose up -d
 ```
+
+The included `docker-compose.yml`:
+
+```yaml
+services:
+  acc:
+    image: acc-server
+    container_name: acc-server
+    restart: unless-stopped
+    init: true
+    ports:
+      - "9600:9600/tcp"
+      - "9600:9600/udp"
+      - "9601:9601/tcp"
+      - "9601:9601/udp"
+    volumes:
+      - ./acc-server:/app
+```
+
+`init: true` ensures signals are properly forwarded to the Wine process, enabling a clean shutdown.
 
 ### Docker CLI
 
@@ -63,36 +144,97 @@ acc-server/
 
 If `configuration.json` uses a custom `udpPort` / `tcpPort`, adjust the `-p` mappings accordingly. Remember that the ACC lobby handshake always uses `udpPort + 1` for both TCP and UDP.
 
-## Docker Compose
+**Important:** The HTTP broadcasting API is used by the container healthcheck. Enable it in your `settings.json`:
 
-A `docker-compose.yml` is included in the repository. Start with:
-
-```sh
-docker compose up -d
+```json
+{
+  "httpServerPort": 8081,
+  "httpServerPassword": "your-password"
+}
 ```
 
-Contents:
-
-```yaml
-services:
-  acc:
-    image: acc-server
-    container_name: acc-server
-    restart: unless-stopped
-    init: true
-    ports:
-      - "9600:9600/tcp"
-      - "9600:9600/udp"
-      - "9601:9601/tcp"
-      - "9601:9601/udp"
-    volumes:
-      - ./acc-server:/app
-```
-
-## Exposed Ports
+## Ports and Networking
 
 | Port | Protocol | Purpose |
 |------|----------|---------|
 | 9600 | TCP + UDP | Main server (client connections and query) |
 | 9601 | TCP + UDP | Lobby registration handshake (9600 + 1) |
 | 8081 | TCP | HTTP broadcasting API (healthcheck) |
+
+Port 8081 is used only for container health monitoring and does not need to be published unless external health checks are desired.
+
+## Healthcheck
+
+The container runs a healthcheck every 30 seconds that verifies the ACC HTTP broadcasting API is reachable on `localhost:8081`. It allows a 5-minute startup grace period and requires 3 consecutive failures before marking the container unhealthy.
+
+The health status can be checked with:
+
+```sh
+docker inspect --format='{{json .State.Health}}' acc-server | jq
+```
+
+## Volumes
+
+| Path | Purpose |
+|------|---------|
+| `/app` | ACC server root (bind-mounted to `./acc-server`) |
+| `/app/cfg` | Server configuration files |
+| `/app/results` | Race result files |
+
+`/app`, `/app/cfg`, and `/app/results` are declared as `VOLUME` in the image. In Docker Compose, the entire `/app` directory is bind-mounted for convenience.
+
+## Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `WINEARCH` | `win64` | Wine architecture (64-bit) |
+| `WINEDEBUG` | `-all` | Suppresses Wine debug output |
+
+## Stopping the Server
+
+The container is configured with `STOPSIGNAL SIGTERM`. To stop gracefully:
+
+```sh
+docker stop acc-server
+```
+
+This sends `SIGTERM` to the Wine/ACC process, allowing it to save state and shut down cleanly.
+
+## Viewing Logs
+
+```sh
+docker logs -f acc-server
+```
+
+## Updating the ACC Server
+
+To update the ACC dedicated server files without rebuilding the Docker image:
+
+```sh
+steamcmd +@sSteamCmdForcePlatformType windows +force_install_dir ./acc-server +login YOUR_STEAM_ACCOUNT +app_update 1430110 +quit
+docker compose restart
+```
+
+If using a pre-built image, also pull the latest version:
+
+```sh
+docker pull ghcr.io/oflorian/dockered-assetto-corsa-competizione-server:latest
+```
+
+## CI/CD
+
+This repository includes a GitHub Actions workflow (`.github/workflows/workflow.yaml`) that builds and publishes the Docker image to `ghcr.io` on every tagged release matching `releases/*`. The workflow:
+
+- Builds for `linux/amd64`
+- Generates SBOM provenance
+- Tags images with the SemVer version and Git SHA
+
+Manual dispatches are also supported via `workflow_dispatch`.
+
+## Contributing
+
+Contributions are welcome. Please open an issue or pull request on [GitHub](https://github.com/oflorian/dockered-assetto-corsa-competizione-server).
+
+## License
+
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
