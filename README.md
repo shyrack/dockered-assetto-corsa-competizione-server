@@ -39,6 +39,7 @@ Docker image providing a Wine runtime to run the Windows-based ACC dedicated ser
 - Built-in healthcheck via the ACC HTTP broadcasting API
 - Pre-built images published to GitHub Container Registry
 - Proper signal handling via `tini` and graceful shutdown via `SIGTERM`
+- Wine debugger disabled to prevent container hangs on crash
 
 ## Quick Start
 
@@ -133,7 +134,8 @@ services:
       - ./acc-server:/app
 ```
 
-`init: true` ensures signals are properly forwarded to the Wine process, enabling a clean shutdown.
+`init: true` ensures signals are properly forwarded to the Tini process, which in turn forwards them to the entrypoint script and Wine processes.
+
 The `build.args` pass your host user's UID/GID to the image. Set them via `UID=$(id -u) GID=$(id -g) docker compose build`.
 
 ### Docker CLI
@@ -279,7 +281,7 @@ The container is configured with `STOPSIGNAL SIGTERM`. To stop gracefully:
 docker stop acc-server
 ```
 
-This sends `SIGTERM` to the Wine/ACC process, allowing it to save state and shut down cleanly.
+The entrypoint script traps `SIGTERM` and runs `wineserver -k` to terminate all Wine processes cleanly. Tini (`ENTRYPOINT`) forwards signals to the process group, ensuring a reliable shutdown even if the ACC process becomes unresponsive.
 
 ## Viewing Logs
 

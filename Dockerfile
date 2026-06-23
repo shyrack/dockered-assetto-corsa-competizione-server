@@ -51,9 +51,12 @@ WORKDIR /app
 RUN mkdir -p \
         /app/cfg \
         /app/results \
-        /home/assetto-corsa-competizione/.wine; \
+        /home/assetto-corsa-competizione/.wine \
+        /tmp/.X11-unix; \
     chown -R assetto-corsa-competizione:assetto-corsa-competizione \
-        /home/assetto-corsa-competizione
+        /home/assetto-corsa-competizione \
+        /tmp/.X11-unix; \
+    rm -f /opt/wine-stable/bin/winedbg
 
 ENV WINEARCH=win64 \
     WINEDEBUG=-all \
@@ -75,24 +78,12 @@ EXPOSE 9601/udp
 
 VOLUME ["/app/cfg", "/app/results"]
 
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
 HEALTHCHECK --interval=30s --timeout=10s --start-period=300s --retries=3 \
     CMD nc -z localhost 8081 || exit 1
 
 USER assetto-corsa-competizione
 
-ENTRYPOINT ["/usr/bin/tini", "-g", "--", "/bin/sh", "-c"]
-CMD ["\
-    set -e; \
-    Xvfb :99 -screen 0 1024x768x16 & \
-    XVFB_PID=$!; \
-    for _ in 1 2 3 4 5 6 7 8 9 10; do \
-        [ -e /tmp/.X99-lock ] && break; \
-        sleep 0.5; \
-    done; \
-    if ! kill -0 $XVFB_PID 2>/dev/null; then \
-        echo 'ERROR: Xvfb failed to start' >&2; \
-        exit 1; \
-    fi; \
-    wineboot -u; \
-    exec wine accServer.exe \
-"]
+ENTRYPOINT ["/usr/bin/tini", "-g", "--", "/usr/local/bin/entrypoint.sh"]
