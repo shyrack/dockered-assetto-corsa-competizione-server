@@ -33,11 +33,12 @@ Docker image providing a Wine runtime to run the Windows-based ACC dedicated ser
 ## Features
 
 - Runs the Windows-based ACC dedicated server on Linux via Wine
-- Alpine-based image for a small footprint
+- Debian-based image with WineHQ stable for compatibility and stability
+- Xvfb virtual display for headless Wine operation
 - Non-root user for improved security
 - Built-in healthcheck via the ACC HTTP broadcasting API
 - Pre-built images published to GitHub Container Registry
-- Graded shutdown via `SIGTERM`
+- Proper signal handling via `tini` and graceful shutdown via `SIGTERM`
 
 ## Quick Start
 
@@ -88,8 +89,10 @@ If you skip `--build-arg`, the container user defaults to UID 1000. See [File Pe
 Pre-built images are published to `ghcr.io` on every tagged release. Pull the image instead of building:
 
 ```sh
-docker pull ghcr.io/shyrack/dockered-assetto-corsa-competizione-server:latest
+docker pull ghcr.io/shyrack/dockered-assetto-corsa-competizione-server:0
 ```
+
+Replace `:0` with the latest major version tag (see [GitHub Packages](https://github.com/shyrack/dockered-assetto-corsa-competizione-server/pkgs/container/dockered-assetto-corsa-competizione-server) for available tags).
 
 Pre-built images use the default UID 1000. If your host files are owned by a different user, grant world-writable permissions before starting:
 
@@ -247,7 +250,7 @@ docker inspect --format='{{json .State.Health}}' acc-server | jq
 | `/app/cfg` | Server configuration files |
 | `/app/results` | Race result files |
 
-`/app`, `/app/cfg`, and `/app/results` are declared as `VOLUME` in the image. In Docker Compose, the entire `/app` directory is bind-mounted for convenience.
+`/app/cfg` and `/app/results` are declared as `VOLUME` in the image. In Docker Compose, the entire `/app` directory is bind-mounted for convenience.
 
 Wine stores its configuration (registry, drive mappings) at `/home/assetto-corsa-competizione/.wine` inside the container. This directory is **not** on the bind mount and is always owned by the container user.
 
@@ -257,7 +260,9 @@ Wine stores its configuration (registry, drive mappings) at `/home/assetto-corsa
 |----------|---------|-------------|
 | `WINEARCH` | `win64` | Wine architecture (64-bit) |
 | `WINEDEBUG` | `-all` | Suppresses Wine debug output |
+| `WINEDLLOVERRIDES` | `mscoree,mshtml=` | Disables Mono and Gecko installation prompts |
 | `WINEPREFIX` | `/home/assetto-corsa-competizione/.wine` | Wine configuration directory (inside container, not on the bind mount) |
+| `DISPLAY` | `:99` | X11 display for the virtual frame buffer |
 
 ### Build Arguments
 
@@ -294,7 +299,7 @@ docker compose restart
 If using a pre-built image, also pull the latest version:
 
 ```sh
-docker pull ghcr.io/shyrack/dockered-assetto-corsa-competizione-server:latest
+docker pull ghcr.io/shyrack/dockered-assetto-corsa-competizione-server:0
 ```
 
 ## CI/CD
@@ -302,7 +307,7 @@ docker pull ghcr.io/shyrack/dockered-assetto-corsa-competizione-server:latest
 This repository includes a GitHub Actions workflow (`.github/workflows/workflow.yaml`) that builds and publishes the Docker image to `ghcr.io` on every tagged release matching `releases/*`. The workflow:
 
 - Builds for `linux/amd64`
-- Tags images with SemVer (`0.0.1`, `0.0`, `0`), `latest`, and Git SHA
+- Tags images with SemVer (`0.0.1`, `0.0`, `0`) and Git SHA
 
 Manual dispatches are also supported via `workflow_dispatch`.
 
