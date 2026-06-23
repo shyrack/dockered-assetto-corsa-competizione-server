@@ -6,6 +6,7 @@ RUN set -eux; \
     dpkg --add-architecture i386; \
     apt-get update; \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        ca-certificates \
         curl \
         gnupg \
         netcat-openbsd \
@@ -14,8 +15,9 @@ RUN set -eux; \
         xvfb; \
     mkdir -p /etc/apt/keyrings; \
     curl -fsSL -o /tmp/winehq.key https://dl.winehq.org/wine-builds/winehq.key; \
-    if ! gpg --with-colons --with-fingerprint /tmp/winehq.key 2>/dev/null \
-        | grep -q "^fpr:::::::::D43F640145369C51D786DDEA76F1A20FF987672F:$"; then \
+    if ! gpg --show-keys --with-fingerprint /tmp/winehq.key 2>/dev/null \
+        | tr -d '[:space:]' \
+        | grep -q 'D43F640145369C51D786DDEA76F1A20FF987672F'; then \
         echo "ERROR: WineHQ GPG key fingerprint mismatch" >&2; \
         exit 1; \
     fi; \
