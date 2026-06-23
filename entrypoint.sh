@@ -8,7 +8,7 @@ cleanup() {
     exit 0
 }
 
-trap cleanup SIGTERM SIGINT SIGQUIT
+trap cleanup TERM INT QUIT
 
 Xvfb :99 -screen 0 1024x768x16 +extension RANDR &
 XVFB_PID=$!
