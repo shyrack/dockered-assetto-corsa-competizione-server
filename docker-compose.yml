@@ -1,5 +1,10 @@
 services:
   acc:
+    build:
+      context: .
+      args:
+        UID: ${UID:-1000}
+        GID: ${GID:-1000}
     image: acc-server
     container_name: acc-server
     restart: unless-stopped

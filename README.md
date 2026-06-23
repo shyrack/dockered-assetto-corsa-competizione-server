@@ -18,6 +18,7 @@ Docker image providing a Wine runtime to run the Windows-based ACC dedicated ser
   - [Docker Compose (recommended)](#docker-compose-recommended)
   - [Docker CLI](#docker-cli)
 - [Configuration](#configuration)
+- [File Permissions](#file-permissions)
 - [Ports and Networking](#ports-and-networking)
 - [Healthcheck](#healthcheck)
 - [Volumes](#volumes)
@@ -48,7 +49,10 @@ steamcmd +@sSteamCmdForcePlatformType windows +force_install_dir ./acc-server +l
 mkdir -p acc-server/cfg
 cp configuration.json settings.json event.json acc-server/cfg/
 
-# 3. Start the server
+# 3. Build the image with your host user's UID/GID
+UID=$(id -u) GID=$(id -g) docker compose build --no-cache
+
+# 4. Start the server
 docker compose up -d
 ```
 
@@ -71,9 +75,13 @@ The server files will be in `./acc-server/` with `accServer.exe` at the root.
 
 ### Build from Source
 
+Build the image, passing your host user's UID and GID so the container user can read and write the mounted server files:
+
 ```sh
-docker build -t acc-server .
+docker build --build-arg UID=$(id -u) --build-arg GID=$(id -g) -t acc-server .
 ```
+
+If you skip `--build-arg`, the container user defaults to UID 1000. See [File Permissions](#file-permissions) for details.
 
 ### Use Pre-built Image
 
@@ -83,7 +91,13 @@ Pre-built images are published to `ghcr.io` on every tagged release. Pull the im
 docker pull ghcr.io/shyrack/dockered-assetto-corsa-competizione-server:latest
 ```
 
-If using the pre-built image, update your `docker-compose.yml` or `docker run` command to reference the `ghcr.io` image.
+Pre-built images use the default UID 1000. If your host files are owned by a different user, grant world-writable permissions before starting:
+
+```sh
+chmod -R 777 ./acc-server
+```
+
+If using the pre-built image, remove the `build:` section from `docker-compose.yml` and reference the `ghcr.io` image directly:
 
 ## Running the Server
 
@@ -98,6 +112,11 @@ The included `docker-compose.yml`:
 ```yaml
 services:
   acc:
+    build:
+      context: .
+      args:
+        UID: ${UID:-1000}
+        GID: ${GID:-1000}
     image: acc-server
     container_name: acc-server
     restart: unless-stopped
@@ -112,6 +131,7 @@ services:
 ```
 
 `init: true` ensures signals are properly forwarded to the Wine process, enabling a clean shutdown.
+The `build.args` pass your host user's UID/GID to the image. Set them via `UID=$(id -u) GID=$(id -g) docker compose build`.
 
 ### Docker CLI
 
@@ -126,6 +146,12 @@ docker run -d \
   -p 9601:9601/tcp \
   -p 9601:9601/udp \
   acc-server
+```
+
+If your host UID differs from 1000, build the image first with matching args:
+
+```sh
+docker build --build-arg UID=$(id -u) --build-arg GID=$(id -g) -t acc-server .
 ```
 
 ## Configuration
@@ -152,6 +178,46 @@ If `configuration.json` uses a custom `udpPort` / `tcpPort`, adjust the `-p` map
   "httpServerPassword": "your-password"
 }
 ```
+
+## File Permissions
+
+### Why Permissions Matter
+
+Wine requires the directory hosting its configuration (the Wine prefix) to be **owned** by the user running the process — it is not enough for the directory to be writable. The container runs as a non-root user, and the ACC server files are bind-mounted from the host. If the host files are owned by a different UID than the container user, Wine refuses to start with:
+
+```
+wine: '/app' is not owned by you, refusing to create a configuration directory there
+```
+
+### How It Works
+
+The image solves this by placing Wine's configuration **inside the container** (at `/home/assetto-corsa-competizione/.wine`), where the container user always owns the directory. The bind-mounted `/app` directory is used only for the ACC server executable and its data — Wine does not try to write its own configuration there.
+
+For the ACC server to write configs and results to the mounted volume, the container user still needs write permission on `/app`. This is handled by matching the container user's UID/GID to the host file owner at build time.
+
+### Matching UIDs (Recommended)
+
+Build the image with your host user's UID and GID:
+
+```sh
+UID=$(id -u) GID=$(id -g) docker compose build --no-cache
+```
+
+Or with plain Docker:
+
+```sh
+docker build --build-arg UID=$(id -u) --build-arg GID=$(id -g) -t acc-server .
+```
+
+### World-Writable Fallback (Pre-built Images)
+
+If you are using the pre-built image from `ghcr.io` (which uses UID 1000) and your host files are owned by a different user, make the directory world-writable:
+
+```sh
+chmod -R 777 ./acc-server
+```
+
+This is the same approach used by many Docker game server images and works because the Wine prefix itself lives inside the container.
 
 ## Ports and Networking
 
@@ -183,12 +249,22 @@ docker inspect --format='{{json .State.Health}}' acc-server | jq
 
 `/app`, `/app/cfg`, and `/app/results` are declared as `VOLUME` in the image. In Docker Compose, the entire `/app` directory is bind-mounted for convenience.
 
+Wine stores its configuration (registry, drive mappings) at `/home/assetto-corsa-competizione/.wine` inside the container. This directory is **not** on the bind mount and is always owned by the container user.
+
 ## Environment Variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `WINEARCH` | `win64` | Wine architecture (64-bit) |
 | `WINEDEBUG` | `-all` | Suppresses Wine debug output |
+| `WINEPREFIX` | `/home/assetto-corsa-competizione/.wine` | Wine configuration directory (inside container, not on the bind mount) |
+
+### Build Arguments
+
+| Argument | Default | Description |
+|----------|---------|-------------|
+| `UID` | `1000` | UID of the container user. Set to `$(id -u)` to match your host user. |
+| `GID` | `1000` | GID of the container user. Set to `$(id -g)` to match your host group. |
 
 ## Stopping the Server
 
