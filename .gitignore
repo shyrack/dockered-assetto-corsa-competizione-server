@@ -1,6 +1,15 @@
 # Downloaded ACC server files
 acc-server/
 
+# ACC server runtime directories
+cfg/
+log/
+results/
+
+# Proton compatdata volume
+compatdata/
+compatdata_test/
+
 # Docker artifacts
 *.tar
 *.gz

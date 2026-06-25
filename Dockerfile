@@ -6,32 +6,32 @@ RUN set -eux; \
     dpkg --add-architecture i386; \
     apt-get update; \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-        ca-certificates \
-        curl \
-        gnupg \
-        netcat-openbsd \
-        tini \
-        winbind \
-        xvfb; \
-    mkdir -p /etc/apt/keyrings; \
-    curl -fsSL -o /tmp/winehq.key https://dl.winehq.org/wine-builds/winehq.key; \
-    if ! gpg --show-keys --with-fingerprint /tmp/winehq.key 2>/dev/null \
-        | tr -d '[:space:]' \
-        | grep -q 'D43F640145369C51D786DDEA76F1A20FF987672F'; then \
-        echo "ERROR: WineHQ GPG key fingerprint mismatch" >&2; \
-        exit 1; \
-    fi; \
-    cat /tmp/winehq.key | gpg --dearmor > /etc/apt/keyrings/winehq-archive.key; \
-    rm /tmp/winehq.key; \
-    curl -fsSL -o /etc/apt/sources.list.d/winehq-trixie.sources \
-        https://dl.winehq.org/wine-builds/debian/dists/trixie/winehq-trixie.sources; \
-    apt-get update; \
-    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-        winehq-stable; \
-    ln -sf /opt/wine-stable/bin/wine       /usr/bin/wine; \
-    ln -sf /opt/wine-stable/bin/wineboot   /usr/bin/wineboot; \
-    ln -sf /opt/wine-stable/bin/wineserver /usr/bin/wineserver; \
-    apt-get remove --purge -y curl gnupg gnupg2; \
+    ca-certificates \
+    curl \
+    libc6:i386 \
+    libfreetype6:amd64 \
+    libfreetype6:i386 \
+    netcat-openbsd \
+    python3 \
+    tini \
+    xz-utils
+
+ARG UMU_PROTON_VERSION=UMU-Proton-10.0-4
+RUN set -eux; \
+    mkdir -p /opt/umu-proton; \
+    curl -sSL "https://github.com/Open-Wine-Components/umu-proton/releases/download/${UMU_PROTON_VERSION}/${UMU_PROTON_VERSION}.tar.gz" \
+    | tar xz -C /opt/umu-proton; \
+    ln -s "/opt/umu-proton/${UMU_PROTON_VERSION}" /opt/umu-proton/current
+
+ENV STEAM_COMPAT_DATA_PATH=/app/compatdata \
+    STEAM_COMPAT_CLIENT_INSTALL_PATH=/nonexistent \
+    UMU_ID=acc-server \
+    STORE=none \
+    WINEDEBUG=-all
+ENV PATH=/opt/umu-proton/current:$PATH
+
+RUN set -eux; \
+    apt-get remove --purge -y curl xz-utils; \
     apt-get autoremove --purge -y; \
     rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
 
@@ -41,32 +41,21 @@ ARG GID=1000
 RUN set -eux; \
     groupadd --gid "$GID" assetto-corsa-competizione; \
     useradd --uid "$UID" --gid "$GID" \
-        --home-dir /home/assetto-corsa-competizione \
-        --shell /usr/sbin/nologin \
-        --create-home \
-        assetto-corsa-competizione
+    --home-dir /home/assetto-corsa-competizione \
+    --shell /usr/sbin/nologin \
+    --create-home \
+    assetto-corsa-competizione
 
-WORKDIR /app
+RUN echo "acc-server-00000000000000000000000000000001" > /etc/machine-id
 
-RUN mkdir -p \
-        /app/cfg \
-        /app/results \
-        /home/assetto-corsa-competizione/.wine \
-        /tmp/.X11-unix; \
-    chown -R assetto-corsa-competizione:assetto-corsa-competizione \
-        /home/assetto-corsa-competizione \
-        /tmp/.X11-unix; \
-    rm -f /opt/wine-stable/bin/winedbg
+RUN mkdir -p /app/compatdata && chown assetto-corsa-competizione:assetto-corsa-competizione /app/compatdata
 
-ENV WINEARCH=win64 \
-    WINEDEBUG=-all \
-    WINEDLLOVERRIDES="mscoree,mshtml=" \
-    WINEPREFIX=/home/assetto-corsa-competizione/.wine \
-    DISPLAY=:99
+WORKDIR /app/server
 
-LABEL org.opencontainers.image.title="Dockered ACC Server" \
-      org.opencontainers.image.description="Wine runtime for Assetto Corsa Competizione dedicated server" \
-      org.opencontainers.image.licenses="MIT"
+LABEL \
+    org.opencontainers.image.title="Dockered ACC Server" \
+    org.opencontainers.image.description="Proton runtime for Assetto Corsa Competizione dedicated server" \
+    org.opencontainers.image.licenses="MIT"
 
 STOPSIGNAL SIGTERM
 
@@ -76,14 +65,11 @@ EXPOSE 9600/udp
 EXPOSE 9601/tcp
 EXPOSE 9601/udp
 
-VOLUME ["/app/cfg", "/app/results"]
-
-COPY entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh
+VOLUME ["/app/cfg", "/app/compatdata", "/app/results"]
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=300s --retries=3 \
     CMD nc -z localhost 8081 || exit 1
 
 USER assetto-corsa-competizione
 
-ENTRYPOINT ["/usr/bin/tini", "-g", "--", "/usr/local/bin/entrypoint.sh"]
+ENTRYPOINT ["/usr/bin/tini", "-g", "--", "proton", "run", "accServer.exe"]
