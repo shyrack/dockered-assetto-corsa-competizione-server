@@ -27,7 +27,8 @@ ENV STEAM_COMPAT_DATA_PATH=/app/compatdata \
     STEAM_COMPAT_CLIENT_INSTALL_PATH=/nonexistent \
     UMU_ID=acc-server \
     STORE=none \
-    WINEDEBUG=-all
+    WINEDEBUG=-all \
+    PROTON_NO_FSYNC=1
 ENV PATH=/opt/umu-proton/current:$PATH
 
 RUN set -eux; \
@@ -65,11 +66,9 @@ EXPOSE 9600/udp
 EXPOSE 9601/tcp
 EXPOSE 9601/udp
 
-VOLUME ["/app/cfg", "/app/compatdata", "/app/results"]
-
 HEALTHCHECK --interval=30s --timeout=10s --start-period=300s --retries=3 \
     CMD nc -z localhost 8081 || exit 1
 
 USER assetto-corsa-competizione
 
-ENTRYPOINT ["/usr/bin/tini", "-g", "--", "proton", "run", "accServer.exe"]
+ENTRYPOINT ["/usr/bin/tini", "-g", "--", "proton", "run", "/app/accServer.exe"]
