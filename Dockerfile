@@ -71,4 +71,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=300s --retries=3 \
 
 USER assetto-corsa-competizione
 
-ENTRYPOINT ["/usr/bin/tini", "-g", "--", "proton", "run", "/app/accServer.exe"]
+ENTRYPOINT ["/usr/bin/tini", "-g", "--", "proton", "run", "accServer.exe"]
