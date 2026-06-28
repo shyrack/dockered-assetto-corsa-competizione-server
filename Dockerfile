@@ -60,14 +60,13 @@ LABEL \
 
 STOPSIGNAL SIGTERM
 
-EXPOSE 8081/tcp
 EXPOSE 9600/tcp
 EXPOSE 9600/udp
 EXPOSE 9601/tcp
 EXPOSE 9601/udp
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=300s --retries=3 \
-    CMD nc -z localhost 8081 || exit 1
+    CMD nc -z localhost 9601 || exit 1
 
 USER assetto-corsa-competizione
 
