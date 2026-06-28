@@ -50,7 +50,7 @@ RUN echo "acc-server-00000000000000000000000000000001" > /etc/machine-id
 
 RUN mkdir -p /app/compatdata && chown assetto-corsa-competizione:assetto-corsa-competizione /app/compatdata
 
-WORKDIR /app/server
+WORKDIR /app
 
 LABEL \
     org.opencontainers.image.title="Dockered ACC Server" \

@@ -14,10 +14,7 @@ services:
       - "9601:9601/tcp"
       - "9601:9601/udp"
     volumes:
-      - ./acc-server/accServer.exe:/app/server/accServer.exe:ro
-      - ./cfg:/app/server/cfg
-      - ./results:/app/server/results
-      - ./log:/app/server/log
+      - ./acc-server:/app
       - compatdata:/app/compatdata
 
 volumes:
