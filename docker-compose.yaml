@@ -14,8 +14,4 @@ services:
       - "9601:9601/tcp"
       - "9601:9601/udp"
     volumes:
-      - ./acc-server:/app
-      - compatdata:/app/compatdata
-
-volumes:
-  compatdata:
+      - ./acc-server:/app:ro

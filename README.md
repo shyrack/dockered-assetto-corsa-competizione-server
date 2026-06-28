@@ -35,9 +35,10 @@ Docker image providing an UMU-Proton runtime to run the Windows-based ACC dedica
 - Runs the Windows-based ACC dedicated server on Linux via UMU-Proton 10.0
 - Debian Trixie (13) slim base with Python 3 and i386 multiarch support
 - Non-root user for improved security
-- Built-in healthcheck via the ACC HTTP broadcasting API
+- Built-in healthcheck via TCP connectivity to the ACC server port
 - Pre-built images published to GitHub Container Registry
 - Proper signal handling via `tini` and graceful shutdown via `SIGTERM`
+- Server binaries mounted read-only from the host; config, results, logs, and the Proton prefix live inside the container
 
 ## Quick Start
 
@@ -86,13 +87,9 @@ docker pull ghcr.io/shyrack/dockered-assetto-corsa-competizione-server:0
 
 Replace `:0` with the latest major version tag (see [GitHub Packages](https://github.com/shyrack/dockered-assetto-corsa-competizione-server/pkgs/container/dockered-assetto-corsa-competizione-server) for available tags).
 
-Pre-built images use the default UID 1000. If your host files are owned by a different user, grant world-writable permissions before starting:
+Pre-built images use the default UID 1000. If your host files are owned by a different user, see [File Permissions](#file-permissions) for matching UIDs.
 
-```sh
-chmod -R 777 ./acc-server
-```
-
-If using the pre-built image, remove the `build:` section from `docker-compose.yml` and reference the `ghcr.io` image directly:
+If using the pre-built image, remove the `build:` section from `docker-compose.yaml` and reference the `ghcr.io` image directly:
 
 ## Running the Server
 
@@ -102,7 +99,7 @@ If using the pre-built image, remove the `build:` section from `docker-compose.y
 docker compose up -d
 ```
 
-The included `docker-compose.yml`:
+The included `docker-compose.yaml`:
 
 ```yaml
 services:
@@ -121,13 +118,7 @@ services:
       - "9601:9601/tcp"
       - "9601:9601/udp"
     volumes:
-      - ./cfg:/app/server/cfg
-      - ./results:/app/server/results
-      - ./log:/app/server/log
-      - compatdata:/app/compatdata
-
-volumes:
-  compatdata:
+      - ./acc-server:/app:ro
 ```
 
 The `build.args` pass your host user's UID/GID to the image. Set them via `UID=$(id -u) GID=$(id -g) docker compose build`.
@@ -138,10 +129,7 @@ The `build.args` pass your host user's UID/GID to the image. Set them via `UID=$
 docker run -d \
   --name acc-server \
   --restart unless-stopped \
-  -v "$(pwd)/cfg:/app/server/cfg" \
-  -v "$(pwd)/results:/app/server/results" \
-  -v "$(pwd)/log:/app/server/log" \
-  -v "$(pwd)/acc-server/accServer.exe:/app/server/accServer.exe:ro" \
+  -v "$(pwd)/acc-server:/app:ro" \
   -p 9600:9600/tcp \
   -p 9600:9600/udp \
   -p 9601:9601/tcp \
@@ -157,35 +145,25 @@ docker build --build-arg UID=$(id -u) --build-arg GID=$(id -g) -t acc-server .
 
 ## Configuration
 
-The ACC server expects configuration files in a `cfg/` directory next to the executable. The docker-compose setup mounts local directories:
+The ACC server uses configuration files from the `cfg/` directory inside the server bundle. The server bundle is mounted read-only at `/app` — config, results, and logs stay inside the container.
 
 ```
 project/
-├── cfg/            # mounted to /app/server/cfg
-│   ├── configuration.json
-│   ├── settings.json
-│   └── event.json
-├── results/        # mounted to /app/server/results
-├── log/            # mounted to /app/server/log
-└── docker-compose.yml
+├── acc-server/     # mounted read-only to /app
+└── docker-compose.yaml
 ```
 
-After downloading the server files with SteamCMD, copy the default config into the local cfg directory:
+### Settings for Wine / Proton
 
-```sh
-cp -a ./acc-server/cfg/* ./cfg/
-```
-
-If `configuration.json` uses a custom `udpPort` / `tcpPort`, adjust the `-p` mappings accordingly. Remember that the ACC lobby handshake always uses `udpPort + 1` for both TCP and UDP.
-
-**Important:** The HTTP broadcasting API is used by the container healthcheck. Enable it in your `settings.json`:
+Running the ACC server under Wine requires the `"ignorePrematureDisconnects"` setting to be set to `0` in `/app/cfg/settings.json`. Wine's TCP stack can cause false-positive premature disconnect detection, and disabling it prevents the server from booting players incorrectly.
 
 ```json
 {
-  "httpServerPort": 8081,
-  "httpServerPassword": "your-password"
+  "ignorePrematureDisconnects": 0
 }
 ```
+
+If `configuration.json` uses a custom `udpPort` / `tcpPort`, adjust the `-p` mappings accordingly. Remember that the ACC lobby handshake always uses `udpPort + 1` for both TCP and UDP.
 
 ## File Permissions
 
@@ -195,9 +173,7 @@ Proton requires the directory hosting its Wine prefix to be **owned** by the use
 
 ### How It Works
 
-The image solves this by placing Proton's compatdata (Wine prefix) **inside the container** (at `/app/compatdata`), where the container user always owns the directory. The bind-mounted server directory is used only for the ACC server executable and its data — Proton does not try to write its own configuration there.
-
-For the ACC server to write configs, results and logs to the mounted volumes, the container user needs write permission on those directories. This is handled by matching the container user's UID/GID to the host file owner at build time.
+The image places Proton's compatdata (Wine prefix) **inside the container** (at `/app/compatdata`), where the container user always owns the directory. The server bundle is mounted read-only at `/app` — Proton never writes there.
 
 ### Matching UIDs (Recommended)
 
@@ -213,15 +189,15 @@ Or with plain Docker:
 docker build --build-arg UID=$(id -u) --build-arg GID=$(id -g) -t acc-server .
 ```
 
-### World-Writable Fallback (Pre-built Images)
+### Pre-built Images
 
-If you are using the pre-built image from `ghcr.io` (which uses UID 1000) and your host files are owned by a different user, make the directory world-writable:
+If you are using the pre-built image from `ghcr.io` (which uses UID 1000) and your host files are owned by a different user, create a matching user and group on the host:
 
 ```sh
-chmod -R 777 ./acc-server
+groupadd --gid 1000 accserver
+useradd --uid 1000 --gid 1000 --no-create-home accserver
+chown -R 1000:1000 ./acc-server
 ```
-
-This is the same approach used by many Docker game server images and works because the Wine prefix itself lives inside the container.
 
 ## Ports and Networking
 
@@ -229,13 +205,12 @@ This is the same approach used by many Docker game server images and works becau
 |------|----------|---------|
 | 9600 | TCP + UDP | Main server (client connections and query) |
 | 9601 | TCP + UDP | Lobby registration handshake (9600 + 1) |
-| 8081 | TCP | HTTP broadcasting API (healthcheck) |
 
-Port 8081 is used only for container health monitoring and does not need to be published unless external health checks are desired.
+All required ports are defined in the docker-compose file. If `configuration.json` uses custom ports, update the port mappings accordingly.
 
 ## Healthcheck
 
-The container runs a healthcheck every 30 seconds that verifies the ACC HTTP broadcasting API is reachable on `localhost:8081`. It allows a 5-minute startup grace period and requires 3 consecutive failures before marking the container unhealthy.
+The container runs a healthcheck every 30 seconds that verifies the ACC server is listening on the lobby handshake port (`9601` by default) via a TCP connect check. It allows a 5-minute startup grace period and requires 3 consecutive failures before marking the container unhealthy.
 
 The health status can be checked with:
 
@@ -247,13 +222,9 @@ docker inspect --format='{{json .State.Health}}' acc-server | jq
 
 | Path | Purpose |
 |------|---------|
-| `/app/server` | ACC server executables (read-only from host) |
-| `/app/server/cfg` | Server configuration files |
-| `/app/server/results` | Race result files |
-| `/app/server/log` | Server log files |
-| `/app/compatdata` | Proton Wine prefix (named volume, persistent) |
+| `/app` | ACC server bundle — read-only bind mount from `./acc-server` on the host |
 
-Proton stores its configuration (Wine prefix, drive mappings) at `/app/compatdata` inside the container. This directory uses a named Docker volume and is always owned by the container user.
+Configs, results, logs, and the Proton Wine prefix live on paths under `/app` inside the container's writable layer. The Proton compatdata directory at `/app/compatdata` is owned by the container user and persisted within the container's storage.
 
 ## Environment Variables
 
@@ -271,6 +242,12 @@ Proton stores its configuration (Wine prefix, drive mappings) at `/app/compatdat
 |----------|---------|-------------|
 | `UID` | `1000` | UID of the container user. Set to `$(id -u)` to match your host user. |
 | `GID` | `1000` | GID of the container user. Set to `$(id -g)` to match your host group. |
+| `UMU_PROTON_VERSION` | `UMU-Proton-10.0-4` | Version of UMU-Proton to install. |
+| `UMU_PROTON_SHA256` | (pinned) | SHA256 checksum of the Proton tarball for supply-chain verification. |
+
+### Runtime Dependencies
+
+- **python3** — required by UMU-Proton runtime scripts for process management and compatibility.
 
 ## Stopping the Server
 
@@ -309,6 +286,9 @@ This repository includes a GitHub Actions workflow (`.github/workflows/workflow.
 
 - Builds for `linux/amd64`
 - Tags images with SemVer (`0.0.1`, `0.0`, `0`) and Git SHA
+- Verifies the UMU-Proton download against a pinned SHA256 checksum
+- Runs a smoke test to confirm Proton launches correctly
+- Scans the image for CRITICAL and HIGH vulnerabilities with Trivy
 
 Manual dispatches are also supported via `workflow_dispatch`.
 
