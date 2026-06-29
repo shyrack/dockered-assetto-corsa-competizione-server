@@ -25,6 +25,7 @@ RUN set -eux; \
     tar xz -C /opt/umu-proton -f /tmp/umu-proton.tar.gz; \
     rm /tmp/umu-proton.tar.gz; \
     ln -s "/opt/umu-proton/${UMU_PROTON_VERSION}" /opt/umu-proton/current; \
+    cat /proc/sys/kernel/random/uuid | tr -d '-' > /etc/machine-id && chmod 444 /etc/machine-id; \
     apt-get remove --purge -y curl xz-utils; \
     apt-get autoremove --purge -y; \
     rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
