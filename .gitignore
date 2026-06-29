@@ -17,3 +17,8 @@ compatdata_test/
 # OS
 .DS_Store
 Thumbs.db
+
+# Editors
+.kilo/
+.vscode/
+.idea/
