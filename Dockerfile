@@ -5,10 +5,13 @@ FROM debian:13-slim
 ARG UMU_PROTON_VERSION=UMU-Proton-10.0-4
 ARG UMU_PROTON_SHA256=62e99e029a18fa313e6fa63d42390918101730a940e3491c54d9d58cab887c69
 
-RUN set -eux; \
-    dpkg --add-architecture i386; \
-    apt-get update; \
-    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+RUN <<EOF
+set -eux
+
+# Install runtime and build-time dependencies
+dpkg --add-architecture i386
+apt-get update
+DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
     libc6:i386 \
@@ -17,18 +20,26 @@ RUN set -eux; \
     netcat-openbsd \
     python3 \
     tini \
-    xz-utils; \
-    mkdir -p /opt/umu-proton; \
-    curl -sSL "https://github.com/Open-Wine-Components/umu-proton/releases/download/${UMU_PROTON_VERSION}/${UMU_PROTON_VERSION}.tar.gz" \
-    -o /tmp/umu-proton.tar.gz; \
-    echo "${UMU_PROTON_SHA256}  /tmp/umu-proton.tar.gz" | sha256sum -c; \
-    tar xz -C /opt/umu-proton -f /tmp/umu-proton.tar.gz; \
-    rm /tmp/umu-proton.tar.gz; \
-    ln -s "/opt/umu-proton/${UMU_PROTON_VERSION}" /opt/umu-proton/current; \
-    cat /proc/sys/kernel/random/uuid | tr -d '-' > /etc/machine-id && chmod 444 /etc/machine-id; \
-    apt-get remove --purge -y curl xz-utils; \
-    apt-get autoremove --purge -y; \
-    rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
+    xz-utils
+
+# Download and verify UMU-Proton
+mkdir -p /opt/umu-proton
+curl -sSL "https://github.com/Open-Wine-Components/umu-proton/releases/download/${UMU_PROTON_VERSION}/${UMU_PROTON_VERSION}.tar.gz" \
+    -o /tmp/umu-proton.tar.gz
+echo "${UMU_PROTON_SHA256}  /tmp/umu-proton.tar.gz" | sha256sum -c
+tar xz -C /opt/umu-proton -f /tmp/umu-proton.tar.gz
+rm /tmp/umu-proton.tar.gz
+ln -s "/opt/umu-proton/${UMU_PROTON_VERSION}" /opt/umu-proton/current
+
+# Generate a stable machine-id
+cat /proc/sys/kernel/random/uuid | tr -d '-' > /etc/machine-id
+chmod 444 /etc/machine-id
+
+# Remove build-time dependencies and clean up
+apt-get remove --purge -y curl xz-utils
+apt-get autoremove --purge -y
+rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
+EOF
 
 ENV STEAM_COMPAT_DATA_PATH=/app/compatdata \
     STEAM_COMPAT_CLIENT_INSTALL_PATH=/nonexistent \
