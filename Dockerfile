@@ -46,7 +46,9 @@ ENV STEAM_COMPAT_DATA_PATH=/app/compatdata \
     UMU_ID=acc-server \
     STORE=none \
     WINEDEBUG=-all \
-    PROTON_NO_FSYNC=1
+    PROTON_NO_FSYNC=1 \
+    ACC_SERVER_PORT=9600 \
+    ACC_LOBBY_PORT=9601
 ENV PATH=/opt/umu-proton/current:$PATH
 
 ARG UID=1000
@@ -77,7 +79,7 @@ EXPOSE 9601/tcp
 EXPOSE 9601/udp
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=300s --retries=3 \
-    CMD nc -z localhost 9601 || exit 1
+    CMD nc -z localhost $ACC_LOBBY_PORT || exit 1
 
 USER assetto-corsa-competizione
 

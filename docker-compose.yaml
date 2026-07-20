@@ -8,10 +8,13 @@ services:
     image: acc-server
     container_name: acc-server
     restart: unless-stopped
+    environment:
+      - ACC_SERVER_PORT=${ACC_SERVER_PORT:-9600}
+      - ACC_LOBBY_PORT=${ACC_LOBBY_PORT:-9601}
     ports:
-      - "9600:9600/tcp"
-      - "9600:9600/udp"
-      - "9601:9601/tcp"
-      - "9601:9601/udp"
+      - "${ACC_SERVER_PORT:-9600}:${ACC_SERVER_PORT:-9600}/tcp"
+      - "${ACC_SERVER_PORT:-9600}:${ACC_SERVER_PORT:-9600}/udp"
+      - "${ACC_LOBBY_PORT:-9601}:${ACC_LOBBY_PORT:-9601}/tcp"
+      - "${ACC_LOBBY_PORT:-9601}:${ACC_LOBBY_PORT:-9601}/udp"
     volumes:
       - ./acc-server:/app:ro

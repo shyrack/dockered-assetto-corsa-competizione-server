@@ -112,11 +112,13 @@ services:
     image: acc-server
     container_name: acc-server
     restart: unless-stopped
+    environment:
+      - ACC_SERVER_PORT=${ACC_SERVER_PORT:-9600}
     ports:
-      - "9600:9600/tcp"
-      - "9600:9600/udp"
-      - "9601:9601/tcp"
-      - "9601:9601/udp"
+      - "${ACC_SERVER_PORT:-9600}:${ACC_SERVER_PORT:-9600}/tcp"
+      - "${ACC_SERVER_PORT:-9600}:${ACC_SERVER_PORT:-9600}/udp"
+      - "${ACC_LOBBY_PORT:-9601}:${ACC_LOBBY_PORT:-9601}/tcp"
+      - "${ACC_LOBBY_PORT:-9601}:${ACC_LOBBY_PORT:-9601}/udp"
     volumes:
       - ./acc-server:/app:ro
 ```
@@ -130,10 +132,11 @@ docker run -d \
   --name acc-server \
   --restart unless-stopped \
   -v "$(pwd)/acc-server:/app:ro" \
-  -p 9600:9600/tcp \
-  -p 9600:9600/udp \
-  -p 9601:9601/tcp \
-  -p 9601:9601/udp \
+  -e ACC_SERVER_PORT="${ACC_SERVER_PORT:-9600}" \
+  -p "${ACC_SERVER_PORT:-9600}:${ACC_SERVER_PORT:-9600}/tcp" \
+  -p "${ACC_SERVER_PORT:-9600}:${ACC_SERVER_PORT:-9600}/udp" \
+  -p "${ACC_LOBBY_PORT:-9601}:${ACC_LOBBY_PORT:-9601}/tcp" \
+  -p "${ACC_LOBBY_PORT:-9601}:${ACC_LOBBY_PORT:-9601}/udp" \
   acc-server
 ```
 
@@ -163,7 +166,37 @@ Running the ACC server under Wine requires the `"ignorePrematureDisconnects"` se
 }
 ```
 
-If `configuration.json` uses a custom `udpPort` / `tcpPort`, adjust the `-p` mappings accordingly. Remember that the ACC lobby handshake always uses `udpPort + 1` for both TCP and UDP.
+### Custom Ports
+
+To run on non-default ports (e.g. 9620/9621):
+
+1. Edit `./acc-server/cfg/configuration.json`:
+
+   ```json
+   {
+     "tcpPort": 9620,
+     "udpPort": 9620
+   }
+   ```
+
+2. Set environment variables and start:
+
+   ```sh
+   ACC_SERVER_PORT=9620 ACC_LOBBY_PORT=9621 docker compose up -d
+   ```
+
+   Or create a `.env` file in the project root:
+
+   ```
+   ACC_SERVER_PORT=9620
+   ACC_LOBBY_PORT=9621
+   ```
+
+   Docker Compose reads `.env` automatically.
+
+The lobby port must always equal `udpPort + 1` (ACC convention). The `ACC_LOBBY_PORT` environment variable should match this.
+
+If `configuration.json` uses a custom `udpPort` / `tcpPort`, adjust the env vars and port mappings accordingly. Remember that the ACC lobby handshake always uses `udpPort + 1` for both TCP and UDP.
 
 ## File Permissions
 
@@ -206,11 +239,13 @@ chown -R 1000:1000 ./acc-server
 | 9600 | TCP + UDP | Main server (client connections and query) |
 | 9601 | TCP + UDP | Lobby registration handshake (9600 + 1) |
 
-All required ports are defined in the docker-compose file. If `configuration.json` uses custom ports, update the port mappings accordingly.
+The default ports are shown above. Use `ACC_SERVER_PORT` and `ACC_LOBBY_PORT` to override them (see [Custom Ports](#custom-ports)). If `configuration.json` uses custom ports, keep the environment variables in sync — the container does not inject or validate port settings.
 
 ## Healthcheck
 
-The container runs a healthcheck every 30 seconds that verifies the ACC server is listening on the lobby handshake port (`9601` by default) via a TCP connect check. It allows a 5-minute startup grace period and requires 3 consecutive failures before marking the container unhealthy.
+The container runs a healthcheck every 30 seconds that verifies the ACC server is listening on the lobby handshake port via a TCP connect check. By default this checks port 9601 (`ACC_LOBBY_PORT`). It allows a 5-minute startup grace period and requires 3 consecutive failures before marking the container unhealthy.
+
+The healthcheck port adapts automatically to `ACC_LOBBY_PORT`. If you set `ACC_LOBBY_PORT=9621`, the healthcheck probes port 9621.
 
 The health status can be checked with:
 
@@ -230,6 +265,8 @@ Configs, results, logs, and the Proton Wine prefix live on paths under `/app` in
 
 | Variable | Default | Description |
 |----------|---------|-------------|
+| `ACC_SERVER_PORT` | `9600` | Main server port (TCP + UDP). Must match `tcpPort`/`udpPort` in `configuration.json`. |
+| `ACC_LOBBY_PORT` | `9601` | Lobby handshake port (TCP + UDP). Must equal `configuration.json`'s `udpPort + 1`. |
 | `STEAM_COMPAT_DATA_PATH` | `/app/compatdata` | Proton wine prefix location |
 | `STEAM_COMPAT_CLIENT_INSTALL_PATH` | `/nonexistent` | Dummy Steam client path (required by Proton) |
 | `UMU_ID` | `acc-server` | UMU game identifier |
