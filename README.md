@@ -32,7 +32,7 @@ Docker image providing an UMU-Proton runtime to run the Windows-based ACC dedica
 
 ## Features
 
-- Runs the Windows-based ACC dedicated server on Linux via UMU-Proton 10.0
+- Runs the Windows-based ACC dedicated server on Linux via UMU-Proton 11.0
 - Debian Trixie (13) slim base with Python 3 and i386 multiarch support
 - Non-root user for improved security
 - Built-in healthcheck via TCP connectivity to the ACC server port
@@ -279,7 +279,7 @@ Configs, results, logs, and the Proton Wine prefix live on paths under `/app` in
 |----------|---------|-------------|
 | `UID` | `1000` | UID of the container user. Set to `$(id -u)` to match your host user. |
 | `GID` | `1000` | GID of the container user. Set to `$(id -g)` to match your host group. |
-| `UMU_PROTON_VERSION` | `UMU-Proton-10.0-4` | Version of UMU-Proton to install. |
+| `UMU_PROTON_VERSION` | `UMU-Proton-11.0-2e` | Version of UMU-Proton to install. |
 | `UMU_PROTON_SHA256` | (pinned) | SHA256 checksum of the Proton tarball for supply-chain verification. |
 
 ### Runtime Dependencies

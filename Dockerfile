@@ -2,8 +2,8 @@
 
 FROM debian:13-slim
 
-ARG UMU_PROTON_VERSION=UMU-Proton-10.0-4
-ARG UMU_PROTON_SHA256=62e99e029a18fa313e6fa63d42390918101730a940e3491c54d9d58cab887c69
+ARG UMU_PROTON_VERSION=UMU-Proton-11.0-2e
+ARG UMU_PROTON_SHA256=6c5c2fdcef91c5c2a604625ce75008e5a3bada1a5a3317db6dbff2f33211aa9a
 
 RUN <<EOF
 set -eux
@@ -24,12 +24,12 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
 
 # Download and verify UMU-Proton
 mkdir -p /opt/umu-proton
-curl -sSL "https://github.com/Open-Wine-Components/umu-proton/releases/download/${UMU_PROTON_VERSION}/${UMU_PROTON_VERSION}.tar.gz" \
+curl -fsSL "https://github.com/Open-Wine-Components/umu-proton/releases/download/${UMU_PROTON_VERSION}/${UMU_PROTON_VERSION}-x86_64.tar.gz" \
     -o /tmp/umu-proton.tar.gz
 echo "${UMU_PROTON_SHA256}  /tmp/umu-proton.tar.gz" | sha256sum -c
 tar xz -C /opt/umu-proton -f /tmp/umu-proton.tar.gz
 rm /tmp/umu-proton.tar.gz
-ln -s "/opt/umu-proton/${UMU_PROTON_VERSION}" /opt/umu-proton/current
+ln -s "/opt/umu-proton/${UMU_PROTON_VERSION}-x86_64" /opt/umu-proton/current
 
 # Generate a stable machine-id
 cat /proc/sys/kernel/random/uuid | tr -d '-' > /etc/machine-id
